@@ -1,13 +1,19 @@
+using System.Diagnostics;
 using System.Net;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 
 namespace Company.Function
 {
     public class HttpTrigger1
     {
         private readonly ILogger _logger;
+        public JsonSerializerSettings jsonsettingsIndented = new JsonSerializerSettings()
+        {
+            Formatting = Formatting.Indented,
+        };
 
         public HttpTrigger1(ILoggerFactory loggerFactory)
         {
@@ -15,17 +21,56 @@ namespace Company.Function
         }
 
         [Function("HttpTrigger1")]
-        public HttpResponseData Run([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post")] HttpRequestData req)
+        public async Task< HttpResponseData> Run([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post")] HttpRequestData req)
         {
-            var dict = new DictionaryLib.DictionaryLib(DictionaryLib.DictionaryType.Small);
-            _logger.LogInformation("C# HTTP trigger function processed a request.");
-
             var response = req.CreateResponse(HttpStatusCode.OK);
-            response.Headers.Add("Content-Type", "text/plain; charset=utf-8");
+            try 
+            {
+                var dict = new DictionaryLib.DictionaryLib(DictionaryLib.DictionaryType.Small);
+                _logger.LogInformation("C# HTTP trigger function processed a request.");
 
-            response.WriteString($"Welcome to Azure Functions! {DateTime.Now} Word of the day: '{dict.RandomWord()}'");
+                response.Headers.Add("Content-Type", "text/plain; charset=utf-8");
+
+                await Task.Yield();
+                response.WriteString($"Welcome to Azure Functions! {DateTime.Now}. Word of the day: '{dict.RandomWord()}'");
+
+                var sqlResult = await GetSqlDataAsync(response);
+
+            }
+            catch (Exception ex)
+            {
+                response.WriteString(ex.ToString());
+            }
+
 
             return response;
+        }
+
+        public async Task<string> GetSqlDataAsync(HttpResponseData response)
+        {
+            var result = string.Empty;
+            using var sqlUtil = await SqlUtility.CreateSqlUtilityAsync();
+            var query = @"select * from SalesLT.ProductCategory";
+            var lst = new List<object>();
+            await sqlUtil.DoQuerySqlAsync(query, "get prods", (p) =>
+            {
+                var pcid = p["ProductCategoryID"];
+                var parent = p["ParentProductCategoryID"];
+                var name = p["name"];
+                var rowguid = p["rowguid"];
+                var ModifiedDate = p["ModifiedDate"];
+                Trace.WriteLine($"{name}");
+                result += $"{pcid} {name}";
+                lst.Add(new {
+                    pcid,
+                    name, 
+                    ModifiedDate
+                });
+            });
+            var json = JsonConvert.SerializeObject(lst, jsonsettingsIndented);
+            await response.WriteStringAsync(json);
+            return result;
+
         }
     }
 }
