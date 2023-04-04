@@ -17,12 +17,13 @@ namespace Company.Function
         [Function("HttpTrigger1")]
         public HttpResponseData Run([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post")] HttpRequestData req)
         {
+            var dict = new DictionaryLib.DictionaryLib(DictionaryLib.DictionaryType.Small);
             _logger.LogInformation("C# HTTP trigger function processed a request.");
 
             var response = req.CreateResponse(HttpStatusCode.OK);
             response.Headers.Add("Content-Type", "text/plain; charset=utf-8");
 
-            response.WriteString("Welcome to Azure Functions!");
+            response.WriteString($"Welcome to Azure Functions! {DateTime.Now} Word of the day: '{dict.RandomWord()}'");
 
             return response;
         }
