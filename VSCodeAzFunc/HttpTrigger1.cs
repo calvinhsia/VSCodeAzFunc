@@ -32,7 +32,7 @@ namespace Company.Function
                 response.Headers.Add("Content-Type", "text/plain; charset=utf-8");
 
                 await Task.Yield();
-                response.WriteString($"Welcome to Azure Functions! {DateTime.Now}. Word of the day: '{dict.RandomWord()}'");
+                response.WriteString($"MyAZFunc v1 {DateTime.Now}. Word of the day: '{dict.RandomWord()}'");
 
                 var sqlResult = await GetSqlDataAsync(response);
 

@@ -64,6 +64,14 @@
       "command": "host start",
       "isBackground": true,
       "problemMatcher": "$func-dotnet-watch"
-    }
+    },
+    {
+      "label": "host function",
+      "command": "func host start",
+      "type": "shell",
+      "options": {
+        "cwd": "${workspaceFolder}/VSCodeAzFunc"
+      }
+    },    
   ]
 }
