@@ -5,10 +5,14 @@ using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System.IO;
 using System.Net;
+using System.Windows.Markup;
+using System.Windows.Threading;
+using System.Reflection;
 using System.Security.Claims;
 using System.Text;
 using System.Diagnostics;
 using System.Collections.Concurrent;
+using System.Windows;
 
 public class TestBase : ILoggerFactory, IServiceProvider
 {
@@ -205,236 +209,355 @@ public class MyHttpResponseData : HttpResponseData
     public override HttpCookies Cookies => throw new NotImplementedException();
 }
 
-    public class MyTextWriterTraceListener : TextWriterTraceListener, IDisposable
+public class MyTextWriterTraceListener : TextWriterTraceListener, IDisposable
+{
+    private readonly string LogFileName;
+    private readonly TestContext testContext;
+    private readonly MyTextWriterTraceListenerOptions options;
+    public List<string> _lstLoggedStrings;
+    readonly ConcurrentQueue<string> _qLogStrings;
+
+    private Task taskOutput;
+    private CancellationTokenSource ctsBatchProcessor;
+
+    [Flags]
+    public enum MyTextWriterTraceListenerOptions
     {
-        private readonly string LogFileName;
-        private readonly TestContext testContext;
-        private readonly MyTextWriterTraceListenerOptions options;
-        public List<string> _lstLoggedStrings;
-        readonly ConcurrentQueue<string> _qLogStrings;
+        None = 0x0,
+        AddDateTime = 0x1,
+        /// <summary>
+        /// Some tests take a long time and if they fail, it's difficult to examine any output
+        /// Also, getting the test output is very cumbersome: need to click on the Additional Output, then right click/Copy All output, then paste it somewhere
+        /// Plus there's a bug that the right-click/copy all didn't copy all in many versions.
+        /// Turn this on to output to a file in real time. Open the file in VS to watch the test progress
+        /// </summary>
+        OutputToFile = 0x2,
+        /// <summary>
+        /// Output to file while running takes a long time. Do it in batches every second. Ensure disposed
+        /// so much faster (20000 lines takes minutes vs <500 ms)
+        /// </summary>
+        OutputToFileAsync = 0x4
+    }
 
-        private Task taskOutput;
-        private CancellationTokenSource ctsBatchProcessor;
-
-        [Flags]
-        public enum MyTextWriterTraceListenerOptions
+    public MyTextWriterTraceListener(string LogFileName, TestContext testContext, MyTextWriterTraceListenerOptions options = MyTextWriterTraceListenerOptions.OutputToFileAsync)
+    {
+        if (string.IsNullOrEmpty(LogFileName))
         {
-            None = 0x0,
-            AddDateTime = 0x1,
-            /// <summary>
-            /// Some tests take a long time and if they fail, it's difficult to examine any output
-            /// Also, getting the test output is very cumbersome: need to click on the Additional Output, then right click/Copy All output, then paste it somewhere
-            /// Plus there's a bug that the right-click/copy all didn't copy all in many versions.
-            /// Turn this on to output to a file in real time. Open the file in VS to watch the test progress
-            /// </summary>
-            OutputToFile = 0x2,
-            /// <summary>
-            /// Output to file while running takes a long time. Do it in batches every second. Ensure disposed
-            /// so much faster (20000 lines takes minutes vs <500 ms)
-            /// </summary>
-            OutputToFileAsync = 0x4
+            throw new InvalidOperationException("Log filename is null");
         }
-
-        public MyTextWriterTraceListener(string LogFileName, TestContext testContext, MyTextWriterTraceListenerOptions options = MyTextWriterTraceListenerOptions.OutputToFileAsync)
+        this.LogFileName = LogFileName;
+        this.testContext = testContext;
+        this.options = options;
+        _lstLoggedStrings = new List<string>();
+        OutputToLogFileWithRetryAsync(() =>
         {
-            if (string.IsNullOrEmpty(LogFileName))
-            {
-                throw new InvalidOperationException("Log filename is null");
-            }
-            this.LogFileName = LogFileName;
-            this.testContext = testContext;
-            this.options = options;
-            _lstLoggedStrings = new List<string>();
-            OutputToLogFileWithRetryAsync(() =>
-            {
-                File.WriteAllText(LogFileName, string.Empty);
-            }, testContext).Wait();
-            File.Delete(LogFileName);
-            Trace.Listeners.Clear(); // else Debug.Writeline can cause infinite recursion because the Test runner adds a listener.
-            Trace.Listeners.Add(this);
-            if (this.options.HasFlag(MyTextWriterTraceListenerOptions.OutputToFileAsync))
-            {
-                _qLogStrings = new ConcurrentQueue<string>();
-                this.taskOutput = Task.Run(async () =>
-                {
-                    try
-                    {
-                        this.ctsBatchProcessor = new CancellationTokenSource();
-                        bool fShutdown = false;
-                        while (!fShutdown)
-                        {
-                            if (this.ctsBatchProcessor.IsCancellationRequested)
-                            {
-                                fShutdown = true; // we need to go through one last time to clean up
-                            }
-                            var lstBatch = new List<string>();
-                            while (!_qLogStrings.IsEmpty)
-                            {
-                                if (_qLogStrings.TryDequeue(out var msg))
-                                {
-                                    lstBatch.Add(msg);
-                                }
-                            }
-                            if (lstBatch.Count > 0)
-                            {
-                                await MyTextWriterTraceListener.OutputToLogFileWithRetryAsync(() =>
-                                {
-                                    File.AppendAllLines(LogFileName, lstBatch);
-                                }, testContext);
-                            }
-                            try
-                            {
-                                await Task.Delay(TimeSpan.FromSeconds(1), this.ctsBatchProcessor.Token);
-                            }
-                            catch (OperationCanceledException)
-                            {
-                            }
-                        }
-                    }
-                    catch (OperationCanceledException)
-                    {
-                    }
-                });
-            }
-        }
-
-        public override void Write(object? o)
+            File.WriteAllText(LogFileName, string.Empty);
+        }, testContext).Wait();
+        File.Delete(LogFileName);
+        Trace.Listeners.Clear(); // else Debug.Writeline can cause infinite recursion because the Test runner adds a listener.
+        Trace.Listeners.Add(this);
+        if (this.options.HasFlag(MyTextWriterTraceListenerOptions.OutputToFileAsync))
         {
-            Write(o!.ToString());
-        }
-        public override void Write(string? message)
-        {
-            if (message == null)
-            {
-                return;
-            }
-            _lstLoggedStrings.Add(message);
-            var dt = string.Empty;
-            if (this.options.HasFlag(MyTextWriterTraceListenerOptions.AddDateTime))
-            {
-                dt = string.Format("[{0}],",
-                    DateTime.Now.ToString("hh:mm:ss:fff")
-                    ) + $"{Thread.CurrentThread.ManagedThreadId,2} ";
-            }
-            message = dt + message.Replace("{", "{{").Replace("}", "}}");
-            this.testContext.WriteLine(message);
-            if (this.options.HasFlag(MyTextWriterTraceListenerOptions.OutputToFileAsync))
-            {
-                _qLogStrings.Enqueue(message);
-            }
-
-            if (this.options.HasFlag(MyTextWriterTraceListenerOptions.OutputToFile))
+            _qLogStrings = new ConcurrentQueue<string>();
+            this.taskOutput = Task.Run(async () =>
             {
                 try
                 {
-                    if (this.taskOutput != null)
+                    this.ctsBatchProcessor = new CancellationTokenSource();
+                    bool fShutdown = false;
+                    while (!fShutdown)
                     {
-                        this.taskOutput.Wait();
-                        if (!this.taskOutput.IsCompleted) // faulted?
+                        if (this.ctsBatchProcessor.IsCancellationRequested)
                         {
-                            Trace.WriteLine(("Output Task faulted"));
+                            fShutdown = true; // we need to go through one last time to clean up
+                        }
+                        var lstBatch = new List<string>();
+                        while (!_qLogStrings.IsEmpty)
+                        {
+                            if (_qLogStrings.TryDequeue(out var msg))
+                            {
+                                lstBatch.Add(msg);
+                            }
+                        }
+                        if (lstBatch.Count > 0)
+                        {
+                            await MyTextWriterTraceListener.OutputToLogFileWithRetryAsync(() =>
+                            {
+                                File.AppendAllLines(LogFileName, lstBatch);
+                            }, testContext);
+                        }
+                        try
+                        {
+                            await Task.Delay(TimeSpan.FromSeconds(1), this.ctsBatchProcessor.Token);
+                        }
+                        catch (OperationCanceledException)
+                        {
                         }
                     }
-                    this.taskOutput = Task.Run(async () =>
-                    {
-                        await OutputToLogFileWithRetryAsync(() =>
-                        {
-                            File.AppendAllText(LogFileName, message + Environment.NewLine);
-                        }, testContext);
-                    });
                 }
                 catch (OperationCanceledException)
                 {
                 }
-            }
-        }
-
-        public static async Task OutputToLogFileWithRetryAsync(Action actWrite, TestContext tcontext)
-        {
-            var nRetry = 0;
-            var success = false;
-            while (nRetry++ < 10)
-            {
-                try
-                {
-                    actWrite();
-                    success = true;
-                    break;
-                }
-                catch (IOException)
-                {
-                }
-                await Task.Delay(TimeSpan.FromSeconds(0.3));
-            }
-            if (!success)
-            {
-                tcontext?.WriteLine($"Error writing to log #retries ={nRetry}");
-            }
-        }
-
-        public override void WriteLine(object? o)
-        {
-            Write(o!.ToString());
-        }
-        public override void WriteLine(string? message)
-        {
-            Write(message);
-        }
-        public void WriteLine(string str, params object[] args)
-        {
-            Write(string.Format(str, args));
-        }
-        public int VerifyLogStrings(IEnumerable<string> strsExpected, bool ignoreCase = false)
-        {
-            int numFailures = 0;
-            var firstFailure = string.Empty;
-            bool IsIt(string strExpected, string strActual)
-            {
-                var hasit = false;
-                if (!string.IsNullOrEmpty(strActual))
-                {
-                    if (ignoreCase)
-                    {
-                        hasit = strActual.ToLower().Contains(strExpected.ToLower());
-                    }
-                    else
-                    {
-                        hasit = strActual.Contains(strExpected);
-                    }
-                }
-                return hasit;
-            }
-            foreach (var str in strsExpected)
-            {
-                if (!_lstLoggedStrings.Where(s => IsIt(str, s)).Any())
-                {
-                    numFailures++;
-                    if (string.IsNullOrEmpty(firstFailure))
-                    {
-                        firstFailure = str;
-                    }
-                    WriteLine($"Expected '{str}'");
-                }
-            }
-            Assert.AreEqual(0, numFailures, $"1st failure= '{firstFailure}'");
-            return numFailures;
-        }
-
-        public int VerifyLogStrings(string strings, bool ignoreCase = false)
-        {
-            var strs = strings.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-            return VerifyLogStrings(strs, ignoreCase);
-        }
-        protected override void Dispose(bool disposing)
-        {
-            Trace.Listeners.Remove(this);
-            if (this.taskOutput != null)
-            {
-                this.ctsBatchProcessor.Cancel();
-                this.taskOutput.Wait();
-            }
-            base.Dispose(disposing);
+            });
         }
     }
+
+    public override void Write(object? o)
+    {
+        Write(o!.ToString());
+    }
+    public override void Write(string? message)
+    {
+        if (message == null)
+        {
+            return;
+        }
+        _lstLoggedStrings.Add(message);
+        var dt = string.Empty;
+        if (this.options.HasFlag(MyTextWriterTraceListenerOptions.AddDateTime))
+        {
+            dt = string.Format("[{0}],",
+                DateTime.Now.ToString("hh:mm:ss:fff")
+                ) + $"{Thread.CurrentThread.ManagedThreadId,2} ";
+        }
+        message = dt + message.Replace("{", "{{").Replace("}", "}}");
+        this.testContext.WriteLine(message);
+        if (this.options.HasFlag(MyTextWriterTraceListenerOptions.OutputToFileAsync))
+        {
+            _qLogStrings.Enqueue(message);
+        }
+
+        if (this.options.HasFlag(MyTextWriterTraceListenerOptions.OutputToFile))
+        {
+            try
+            {
+                if (this.taskOutput != null)
+                {
+                    this.taskOutput.Wait();
+                    if (!this.taskOutput.IsCompleted) // faulted?
+                    {
+                        Trace.WriteLine(("Output Task faulted"));
+                    }
+                }
+                this.taskOutput = Task.Run(async () =>
+                {
+                    await OutputToLogFileWithRetryAsync(() =>
+                    {
+                        File.AppendAllText(LogFileName, message + Environment.NewLine);
+                    }, testContext);
+                });
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }
+    }
+
+    public static async Task OutputToLogFileWithRetryAsync(Action actWrite, TestContext tcontext)
+    {
+        var nRetry = 0;
+        var success = false;
+        while (nRetry++ < 10)
+        {
+            try
+            {
+                actWrite();
+                success = true;
+                break;
+            }
+            catch (IOException)
+            {
+            }
+            await Task.Delay(TimeSpan.FromSeconds(0.3));
+        }
+        if (!success)
+        {
+            tcontext?.WriteLine($"Error writing to log #retries ={nRetry}");
+        }
+    }
+
+    public override void WriteLine(object? o)
+    {
+        Write(o!.ToString());
+    }
+    public override void WriteLine(string? message)
+    {
+        Write(message);
+    }
+    public void WriteLine(string str, params object[] args)
+    {
+        Write(string.Format(str, args));
+    }
+    public int VerifyLogStrings(IEnumerable<string> strsExpected, bool ignoreCase = false)
+    {
+        int numFailures = 0;
+        var firstFailure = string.Empty;
+        bool IsIt(string strExpected, string strActual)
+        {
+            var hasit = false;
+            if (!string.IsNullOrEmpty(strActual))
+            {
+                if (ignoreCase)
+                {
+                    hasit = strActual.ToLower().Contains(strExpected.ToLower());
+                }
+                else
+                {
+                    hasit = strActual.Contains(strExpected);
+                }
+            }
+            return hasit;
+        }
+        foreach (var str in strsExpected)
+        {
+            if (!_lstLoggedStrings.Where(s => IsIt(str, s)).Any())
+            {
+                numFailures++;
+                if (string.IsNullOrEmpty(firstFailure))
+                {
+                    firstFailure = str;
+                }
+                WriteLine($"Expected '{str}'");
+            }
+        }
+        Assert.AreEqual(0, numFailures, $"1st failure= '{firstFailure}'");
+        return numFailures;
+    }
+
+    public int VerifyLogStrings(string strings, bool ignoreCase = false)
+    {
+        var strs = strings.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+        return VerifyLogStrings(strs, ignoreCase);
+    }
+    protected override void Dispose(bool disposing)
+    {
+        Trace.Listeners.Remove(this);
+        if (this.taskOutput != null)
+        {
+            this.ctsBatchProcessor.Cancel();
+            this.taskOutput.Wait();
+        }
+        base.Dispose(disposing);
+    }
+}
+public class MyWindow : Window//, IMyReportProgress
+{
+    public Window GetMainWindow => this;
+    public System.Windows.Controls.UserControl MyUserControl;
+    public bool ExitWasClicked;
+    public CancellationTokenSource Cts = new();
+    public System.Windows.Controls.Button BtnCancel;
+
+    public MyWindow(TaskCompletionSource<int> tcsWindowClosed)
+    {
+        WindowState = WindowState.Maximized;
+        var strxaml =
+$@"<Grid
+xmlns=""http://schemas.microsoft.com/winfx/2006/xaml/presentation""
+xmlns:x=""http://schemas.microsoft.com/winfx/2006/xaml""
+xmlns:l=""clr-namespace:{GetType().Namespace};assembly={System.IO.Path.GetFileNameWithoutExtension(Assembly.GetExecutingAssembly().Location)}"" 
+        >
+        <Grid>
+            <UserControl x:Name = ""MyUserControl""/>
+        </Grid>
+        <StackPanel Grid.Row=""0"" HorizontalAlignment=""Right"" Height=""28"" VerticalAlignment=""Top"" Orientation=""Horizontal"">
+            <Button x:Name = ""btnCancel"" Width = ""100"" Content=""Cancel"" ToolTip=""Click this button cancel""/>
+            <Button x:Name = ""btnExit"" Width = ""100"" Content=""Exit Test"" ToolTip=""Click this button to close the window and set ExitWasClicked ==True. Close with Alt-F4 or Click the close button to close the window with ExitWasClicked = false""/>
+        </StackPanel>
+    </Grid>
+";
+        var grid = (System.Windows.Controls.Grid)(XamlReader.Parse(strxaml));
+        Content = grid;
+        MyUserControl = (System.Windows.Controls.UserControl)grid.FindName("MyUserControl");
+        BtnCancel = (System.Windows.Controls.Button)grid.FindName("btnCancel");
+        BtnCancel.Click += (_, _) =>
+        {
+            BtnCancel.IsEnabled = false;
+            Cts.Cancel();
+        };
+        var btnExit = (System.Windows.Controls.Button)grid.FindName("btnExit");
+        btnExit.Click += (_, _) =>
+        {
+            ExitWasClicked = true;
+            Close();
+        };
+        Closed += (_, _) =>
+        {
+            Cts.Cancel(); // cancel any pending
+            tcsWindowClosed.SetResult(0);
+        };
+    }
+
+    public static async Task<bool> ShowDataInWindow(Func<MyWindow, Task> actionAsync)
+    {
+        var ExitWasClicked = false;
+        await RunInSTAExecutionContextAsync(async () =>
+        {
+            var tcsWindowClosed = new TaskCompletionSource<int>();
+            var oWindow = new MyWindow(tcsWindowClosed);
+            oWindow.Show();
+            await actionAsync(oWindow);
+            oWindow.BtnCancel.IsEnabled = false;
+            await tcsWindowClosed.Task;
+            if (oWindow.ExitWasClicked)
+            {
+                ExitWasClicked = true;
+            }
+        });
+        return ExitWasClicked;
+    }
+    /// <summary>
+    /// Creates a custom STA thread on which UI elements can run. Has execution context that allows asynchronous code to work
+    /// </summary>
+    public static async Task RunInSTAExecutionContextAsync(Func<Task> actionAsync, string description = "", int maxStackSize = 512 * 1024)
+    {
+        Dispatcher? mySTADispatcher = null;
+        var tcsGetExecutionContext = new TaskCompletionSource<int>();
+        var myStaThread = new Thread(() =>
+        {
+            mySTADispatcher = Dispatcher.CurrentDispatcher;
+            var syncContext = new DispatcherSynchronizationContext(mySTADispatcher); // Create/install the context
+            SynchronizationContext.SetSynchronizationContext(syncContext);
+            tcsGetExecutionContext.SetResult(0);// notify that sync context is ready
+            Dispatcher.Run();  // Start the Dispatcher Processing
+                               //Debug.WriteLine($"Thread done {_description}");
+        }, maxStackSize: maxStackSize)
+        {
+            IsBackground = true,
+            Name = $"MySta{description}" // can be called from within the same context (e.g. a prog bar) so distinguish thread names
+        };
+        myStaThread.SetApartmentState(ApartmentState.STA);
+        myStaThread.Start();
+        await tcsGetExecutionContext.Task; // wait for thread to set up STA sync context
+        var tcsCallerAction = new TaskCompletionSource<int>();
+        if (mySTADispatcher == null)
+        {
+            throw new NullReferenceException(nameof(mySTADispatcher));
+        }
+
+        await mySTADispatcher.InvokeAsync(async () =>
+        {
+            try
+            {
+                await actionAsync();
+            }
+            catch (Exception ex)
+            {
+                tcsCallerAction.SetException(ex);
+                return;
+            }
+            finally
+            {
+                //Debug.WriteLine($"Shutting down dispatcher {_description}");
+                mySTADispatcher.InvokeShutdown();
+            }
+            tcsCallerAction.SetResult(0);
+        });
+        await tcsCallerAction.Task;
+        //Debug.WriteLine($"sta thread finished {_description}");
+    }
+    public static void AddStatusMsg(string message, params object[] args) => Trace.WriteLine(message);
+    public static void Report(string value) => Trace.WriteLine(value);
+}
 
 
