@@ -7,7 +7,7 @@ using Newtonsoft.Json;
 
 namespace Company.Function
 {
-    public class HttpTrigger1
+    public class HttpTrigger1Class
     {
         private readonly ILogger _logger;
         public JsonSerializerSettings jsonsettingsIndented = new JsonSerializerSettings()
@@ -15,13 +15,13 @@ namespace Company.Function
             Formatting = Formatting.Indented,
         };
 
-        public HttpTrigger1(ILoggerFactory loggerFactory)
+        public HttpTrigger1Class(ILoggerFactory loggerFactory)
         {
-            _logger = loggerFactory.CreateLogger<HttpTrigger1>();
+            _logger = loggerFactory.CreateLogger<HttpTrigger1Class>();
         }
 
-        [Function("HttpTrigger1")]
-        public async Task< HttpResponseData> Run([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post")] HttpRequestData req)
+        [Function(nameof(HttpTrigger1))]
+        public async Task< HttpResponseData> HttpTrigger1([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post")] HttpRequestData req)
         {
             var response = req.CreateResponse(HttpStatusCode.OK);
             try 
@@ -32,7 +32,7 @@ namespace Company.Function
                 response.Headers.Add("Content-Type", "text/plain; charset=utf-8");
 
                 await Task.Yield();
-                response.WriteString($"MyAZFunc v1 {DateTime.Now}. Word of the day: '{dict.RandomWord()}'");
+                response.WriteString($"MyAZFunc v2 {DateTime.Now}. Word of the day: '{dict.RandomWord()}'");
 
                 var sqlResult = await GetSqlDataAsync(response);
 
