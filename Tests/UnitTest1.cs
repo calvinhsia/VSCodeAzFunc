@@ -6,6 +6,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Markup;
 using System.Reflection;
+using System.Diagnostics;
 
 [TestClass]
 public class UnitTest1 : TestBase
@@ -24,8 +25,27 @@ public class UnitTest1 : TestBase
         var resp = await oc.HttpTrigger1(req) as MyHttpResponseData;
         var str = resp!.GetResultAsString();
         TestContext.WriteLine($"{str}");
-        //        Assert.Fail("must fail test to see output");
+        //               Assert.Fail("must fail test to see output in OutputPane (Test Explorer (Test runner Output))");
     }
+
+    [TestMethod]
+    public async Task TestGetSecretsAsync()
+    {
+        var s = new Secrets();
+        await s.GetSecretsAsync(logger: new MyLogger(TestContext), ShowDetails: true, act: (s) =>
+        {
+            Trace.WriteLine($"Sec prop {s.Name}  {s.ExpiresOn}");
+        });
+        VerifyLogStrings(new String[] {
+            $"Got secret",
+            "Sec prop MyFirstSecret",
+            "Sec prop MySecondSecret"
+        });
+        Assert.Fail("must fail test to see output in OutputPane (Test Explorer (Test runner Output))");
+    }
+
+
+
     [TestMethod]
     public async Task TestShowWPFUI()
     {
