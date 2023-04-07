@@ -41,7 +41,7 @@ public class UnitTest1 : TestBase
             "Sec prop MyFirstSecret",
             "Sec prop MySecondSecret"
         });
-        Assert.Fail("must fail test to see output in OutputPane (Test Explorer (Test runner Output))");
+//        Assert.Fail("must fail test to see output in OutputPane (Test Explorer (Test runner Output))");
     }
 
 

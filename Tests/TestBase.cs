@@ -530,12 +530,8 @@ xmlns:l=""clr-namespace:{GetType().Namespace};assembly={System.IO.Path.GetFileNa
         myStaThread.Start();
         await tcsGetExecutionContext.Task; // wait for thread to set up STA sync context
         var tcsCallerAction = new TaskCompletionSource<int>();
-        if (mySTADispatcher == null)
-        {
-            throw new NullReferenceException(nameof(mySTADispatcher));
-        }
 
-        await mySTADispatcher.InvokeAsync(async () =>
+        await mySTADispatcher!.InvokeAsync(async () =>
         {
             try
             {
