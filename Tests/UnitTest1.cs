@@ -7,6 +7,7 @@ using System.Windows.Controls;
 using System.Windows.Markup;
 using System.Reflection;
 using System.Diagnostics;
+using System.Net.Http;
 
 [TestClass]
 public class UnitTest1 : TestBase
@@ -24,9 +25,28 @@ public class UnitTest1 : TestBase
 
         var resp = await oc.HttpTrigger1(req) as MyHttpResponseData;
         var str = resp!.GetResultAsString();
-        TestContext.WriteLine($"{str}");
+        Trace.WriteLine($"{str}");
         //               Assert.Fail("must fail test to see output in OutputPane (Test Explorer (Test runner Output))");
+        VerifyLogStrings(new[] {
+            "Word of the day:",
+            """name": "Accessories","""
+        });
     }
+
+    [TestMethod]
+    public async Task TestInvokeinCloud()
+    {
+        var url = @"https://calvinhvscode.azurewebsites.net/api/HttpTrigger1";
+        var httpClient = new HttpClient();
+        var res = await httpClient.GetAsync(url);
+        var data = await res.Content.ReadAsStringAsync();
+        Trace.WriteLine(data);
+        VerifyLogStrings(new[] {
+            "Word of the day:",
+            """name": "Accessories","""
+        });
+    }
+
 
     [TestMethod]
     public async Task TestGetSecretsAsync()
@@ -41,7 +61,7 @@ public class UnitTest1 : TestBase
             "Sec prop MyFirstSecret",
             "Sec prop MySecondSecret"
         });
-//        Assert.Fail("must fail test to see output in OutputPane (Test Explorer (Test runner Output))");
+        //        Assert.Fail("must fail test to see output in OutputPane (Test Explorer (Test runner Output))");
     }
 
 
