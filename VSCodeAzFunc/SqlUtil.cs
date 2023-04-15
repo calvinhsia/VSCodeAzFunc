@@ -1,11 +1,16 @@
 using System.Diagnostics;
 using Microsoft.Data.SqlClient;
+using Newtonsoft.Json;
 
 namespace Company.Function;
 public class SqlUtility : IDisposable
 {
     public SqlConnection SqlConn = new SqlConnection();
     public string LastQuery = string.Empty;
+    public static JsonSerializerSettings jsonsettingsIndented = new JsonSerializerSettings()
+    {
+        Formatting = Formatting.Indented,
+    };
     public static async Task<SqlUtility> CreateSqlUtilityAsync()
     {
         var sq = new SqlUtility();
@@ -60,7 +65,6 @@ public class SqlUtility : IDisposable
             catch (Exception ex)
             {
                 Trace.WriteLine($"Error getting {desc}\r\n{ex.Message}");
-                throw;
             }
         }
     });

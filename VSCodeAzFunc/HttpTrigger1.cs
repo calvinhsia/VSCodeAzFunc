@@ -10,10 +10,6 @@ namespace Company.Function
     public class HttpTrigger1Class
     {
         private readonly ILogger _logger;
-        public JsonSerializerSettings jsonsettingsIndented = new JsonSerializerSettings()
-        {
-            Formatting = Formatting.Indented,
-        };
 
         public HttpTrigger1Class(ILoggerFactory loggerFactory)
         {
@@ -46,7 +42,7 @@ namespace Company.Function
             return response;
         }
 
-        public async Task<string> GetSqlDataAsync(HttpResponseData response)
+        public static async Task<string> GetSqlDataAsync(HttpResponseData response)
         {
             var result = string.Empty;
             using var sqlUtil = await SqlUtility.CreateSqlUtilityAsync();
@@ -67,7 +63,7 @@ namespace Company.Function
                     ModifiedDate
                 });
             });
-            var json = JsonConvert.SerializeObject(lst, jsonsettingsIndented);
+            var json = JsonConvert.SerializeObject(lst, SqlUtility.jsonsettingsIndented);
             await response.WriteStringAsync(json);
             return result;
 

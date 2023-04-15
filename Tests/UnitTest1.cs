@@ -8,6 +8,7 @@ using System.Windows.Markup;
 using System.Reflection;
 using System.Diagnostics;
 using System.Net.Http;
+using Newtonsoft.Json;
 
 [TestClass]
 public class UnitTest1 : TestBase
@@ -21,7 +22,8 @@ public class UnitTest1 : TestBase
         logger.LogInformation($"logger ");
         var req = new MyHttpRequestData(
             new MyFunctionContext(serviceProvider: this),
-            new Uri("localhost:7160/api/UpdateDriverState?Driver_Id=2"));
+            new Uri($"localhost:7160/api/UpdateDriverState?Driver_Id=2")
+        );
 
         var resp = await oc.HttpTrigger1(req) as MyHttpResponseData;
         var str = resp!.GetResultAsString();
@@ -45,6 +47,23 @@ public class UnitTest1 : TestBase
             "Word of the day:",
             """name": "Accessories","""
         });
+    }
+
+    [TestMethod]
+    public async Task TestGetSqlData()
+    {
+        var oc = new GetSqlDataClass(loggerFactory:this);
+        var logger = CreateLogger(nameof(TestGetSqlData));
+        logger.LogInformation($"Starting {nameof(TestGetSqlData)}");
+        var req = new MyHttpRequestData(
+            new MyFunctionContext(serviceProvider:this),
+            new Uri($"localhost:7160/api/GetSqlData?Table=Customer&NumItems=10")
+        );
+        var resp = await oc.GetSqlData(req) as MyHttpResponseData;
+        var data = resp!.GetResultAsString();
+        Trace.WriteLine(data);
+        var json = JsonConvert.DeserializeObject(data);
+
     }
 
 
