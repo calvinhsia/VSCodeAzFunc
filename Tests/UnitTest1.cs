@@ -63,7 +63,21 @@ public class UnitTest1 : TestBase
         var data = resp!.GetResultAsString();
         Trace.WriteLine(data);
         var json = JsonConvert.DeserializeObject(data);
-
+    }
+    [TestMethod]
+    public async Task TestGetSqlDataCustomerBike()
+    {
+        var oc = new GetSqlDataClass(loggerFactory:this);
+        var logger = CreateLogger(nameof(TestGetSqlData));
+        logger.LogInformation($"Starting {nameof(TestGetSqlData)}");
+        var req = new MyHttpRequestData(
+            new MyFunctionContext(serviceProvider:this),
+            new Uri($"localhost:7160/api/GetSqlData?Table=Customer&NumItems=10&Filter=%25bik%25")
+        );
+        var resp = await oc.GetSqlData(req) as MyHttpResponseData;
+        var data = resp!.GetResultAsString();
+        Trace.WriteLine(data);
+        var json = JsonConvert.DeserializeObject(data);
     }
 
 

@@ -18,7 +18,6 @@ namespace Company.Function
         [Function(nameof(GetSqlData))]
         public async Task<HttpResponseData> GetSqlData([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post")] HttpRequestData req)
         {
-
             var response = req.CreateResponse(HttpStatusCode.OK);
             try
             {
@@ -29,13 +28,22 @@ namespace Company.Function
                     numItemsStr = "100";
                 }
                 var numItems = int.Parse(numItemsStr);
+                string? filter = Query?["Filter"];
+                if (filter == null)
+                {
+                    filter = "";
+                }
+                else
+                {
+                    filter = $"where CompanyName like '{filter}'";
+                }
 
                 response.Headers.Add("Content-Type", "application/json");
 
                 using var sqlUtil = await SqlUtility.CreateSqlUtilityAsync();
-                var query = $@"select TOP {numItems} * from SalesLT.Customer";
+                var query = $@"select TOP {numItems} * from SalesLT.Customer {filter}";
                 var lst = new List<object>();
-                await sqlUtil.DoQuerySqlAsync(query, "get prods", (p) =>
+                await sqlUtil.DoQuerySqlAsync(query, "get customers", (p) =>
                 {
                     var obj = new
                     {
