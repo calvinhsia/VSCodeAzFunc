@@ -48,11 +48,16 @@ namespace Company.Function
                 {
                     prettyprint = true;
                 }
+                var tableSchema = Query?["TableSchema"]; // https://calvinhvscode.azurewebsites.net/api/GetSqlData?TableSchema=INFORMATION_SCHEMA&Table=TABLES&NumItems=40&PrettyPrint=1
+                if (tableSchema == null)
+                {
+                    tableSchema = "SalesLT";
+                }
 
                 response.Headers.Add("Content-Type", "application/json");
 
                 using var sqlUtil = await SqlUtility.CreateSqlUtilityAsync();
-                var query = $@"select TOP {numItems} * from SalesLT.{tableNameStr} {filter}";
+                var query = $@"select TOP {numItems} * from {tableSchema}.{tableNameStr} {filter}";
                 var jarray = new JArray();
                 await sqlUtil.DoQuerySqlAsync(query, "get data", (rdr) =>
                 {
