@@ -47,7 +47,7 @@ public class UnitTest1 : TestBase
             "Word of the day:",
             """name": "Accessories","""
         });
-    }
+    } 
 
     [TestMethod]
     public async Task TestGetSqlData()
@@ -57,7 +57,7 @@ public class UnitTest1 : TestBase
         logger.LogInformation($"Starting {nameof(TestGetSqlData)}");
         var req = new MyHttpRequestData(
             new MyFunctionContext(serviceProvider:this),
-            new Uri($"localhost:7160/api/GetSqlData?Table=Customer&NumItems=10")
+            new Uri($"localhost:7160/api/GetSqlData?Table=Customer&NumItems=10&TableName=Customer&Filter=where%20CompanyName%20like%20%27%25bike%25%27")
         );
         var resp = await oc.GetSqlData(req) as MyHttpResponseData;
         var data = resp!.GetResultAsString();
