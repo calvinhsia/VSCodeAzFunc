@@ -22,6 +22,7 @@ namespace Company.Function
             try
             {
                 var Query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
+                var prettyprint = false;
                 string? numItemsStr = Query?["NumItems"];
                 if (string.IsNullOrEmpty(numItemsStr))
                 {
@@ -36,6 +37,10 @@ namespace Company.Function
                 else
                 {
                     filter = $"where CompanyName like '{filter}'";
+                }
+                if (Query?["PrettyPrint"] != null)
+                {
+                    prettyprint = true;
                 }
 
                 response.Headers.Add("Content-Type", "application/json");
@@ -58,7 +63,7 @@ namespace Company.Function
                     lst.Add(obj);
 
                 });
-                var json = JsonConvert.SerializeObject(lst, SqlUtility.jsonsettingsIndented);
+                var json = JsonConvert.SerializeObject(lst, prettyprint ? SqlUtility.jsonsettingsIndented : null);
                 await response.WriteStringAsync(json);
             }
             catch (System.Exception ex)
