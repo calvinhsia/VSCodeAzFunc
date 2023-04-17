@@ -56,8 +56,14 @@ namespace Company.Function
 
                 response.Headers.Add("Content-Type", "application/json");
 
-                using var sqlUtil = await SqlUtility.CreateSqlUtilityAsync();
                 var query = $@"select TOP {numItems} * from {tableSchema}.{tableNameStr} {filter}";
+                var sql = Query?["Sql"];
+                if (sql != null)
+                {
+                    query = sql;
+                }
+                _logger.LogInformation($"Sql: {query}");
+                using var sqlUtil = await SqlUtility.CreateSqlUtilityAsync();
                 var jarray = new JArray();
                 await sqlUtil.DoQuerySqlAsync(query, "get data", (rdr) =>
                 {
@@ -85,6 +91,7 @@ namespace Company.Function
                     }
                     jarray.Add(js);
                 });
+                _logger.LogInformation($"Sql # results = : {jarray.Count}");
                 var json = JsonConvert.SerializeObject(jarray, prettyprint ? SqlUtility.jsonsettingsIndented : null);
                 await response.WriteStringAsync(json);
             }

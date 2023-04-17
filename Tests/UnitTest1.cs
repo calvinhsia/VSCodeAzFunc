@@ -57,12 +57,31 @@ public class UnitTest1 : TestBase
         logger.LogInformation($"Starting {nameof(TestGetSqlData)}");
         var req = new MyHttpRequestData(
             new MyFunctionContext(serviceProvider:this),
-            new Uri($"localhost:7160/api/GetSqlData?Table=Customer&NumItems=10&TableName=Customer&Filter=where%20CompanyName%20like%20%27%25bike%25%27")
+            new Uri($"localhost:7160/api/GetSqlData?Table=Customer&NumItems=10&PrettyPrint=1&TableName=Customer&Filter=where%20CompanyName%20like%20%27%25bike%25%27")
         );
         var resp = await oc.GetSqlData(req) as MyHttpResponseData;
         var data = resp!.GetResultAsString();
         Trace.WriteLine(data);
         var json = JsonConvert.DeserializeObject(data);
+    }
+    [TestMethod]
+    public async Task TestGetSqlDataWithSqlStatement()
+    {
+        var oc = new GetSqlDataClass(loggerFactory: this);
+        var logger = CreateLogger(nameof(TestGetSqlData));
+        logger.LogInformation($"Starting {nameof(TestGetSqlData)}");
+        var req = new MyHttpRequestData(
+            new MyFunctionContext(serviceProvider: this),
+            new Uri($"localhost:7160/api/GetSqlData?PrettyPrint=1Sql=Select * from Customer")
+        );
+        var resp = await oc.GetSqlData(req) as MyHttpResponseData;
+        var data = resp!.GetResultAsString();
+        Trace.WriteLine(data);
+        var json = JsonConvert.DeserializeObject(data);
+        VerifyLogStrings(new[] {
+            """FirstName": "Orlando""",
+            """SalesPerson": "adventure-works\\pamela0"""
+            });
     }
     [TestMethod]
     public async Task TestGetSqlDataCustomerBike()
