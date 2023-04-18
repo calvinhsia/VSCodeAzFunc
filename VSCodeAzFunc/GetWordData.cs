@@ -38,7 +38,7 @@ namespace Company.Function
                 var jObject = new JObject();
                 jObject.Add("RandWord", randWord);
                 jObject.Add("Grid", grid);
-                jObject.Add("Calculated in ", sw.Elapsed.TotalSeconds.ToString("n3"));
+                jObject.Add("Calculatedin", sw.Elapsed.TotalSeconds.ToString("n3"));
 
                 await response.WriteStringAsync(JsonConvert.SerializeObject(jObject, SqlUtility.jsonsettingsIndented));
             }
@@ -148,7 +148,7 @@ namespace Company.Function
                     }
                     return isGood;
                 };
-                recurlam(0, 0, 0);
+                recurlam(random!.Next(nRows), random!.Next(nCols), 0);
                 if (isGood)
                 {
                     for (int i = 0; i < nRows; i++)
@@ -163,8 +163,10 @@ namespace Company.Function
                             resGrid += c;
                         }
                     }
+                    resGrid = resGrid.ToUpper();
                 }
             }
+            randWord = randWord.ToUpper();
             return (randWord, resGrid);
         }
     }

@@ -30,9 +30,6 @@ public class UnitTest1 : TestBase
         var resp = await oc.GetWordData(req) as MyHttpResponseData;
         var str = resp!.GetResultAsString();
         Trace.WriteLine($"{str}");
-
-
-
     }
 
     [TestMethod]

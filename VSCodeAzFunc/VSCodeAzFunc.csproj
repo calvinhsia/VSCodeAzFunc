@@ -11,7 +11,7 @@
     <PackageReference Include="Azure.Identity" Version="1.8.2" />
     <PackageReference Include="Azure.Security.KeyVault.Keys" Version="4.5.0" />
     <PackageReference Include="Azure.Security.KeyVault.Secrets" Version="4.5.0" />
-    <PackageReference Include="DictionaryLib_Calvin_Hsia" Version="1.0.3" />
+    <PackageReference Include="DictionaryLib_Calvin_Hsia" Version="1.0.7" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker" Version="1.10.0" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Http" Version="3.0.13" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker.Sdk" Version="1.7.0" />
