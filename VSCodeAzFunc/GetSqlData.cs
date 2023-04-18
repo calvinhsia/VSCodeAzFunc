@@ -1,5 +1,6 @@
 using System.Net;
 using System.Reflection.PortableExecutable;
+using System.Text.Encodings.Web;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
@@ -21,10 +22,10 @@ namespace Company.Function
         public async Task<HttpResponseData> GetSqlData([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post")] HttpRequestData req)
         {
             var response = req.CreateResponse(HttpStatusCode.OK);
+            var prettyprint = false;
             try
             {
                 var Query = System.Web.HttpUtility.ParseQueryString(req.Url.Query);
-                var prettyprint = false;
                 string? numItemsStr = Query?["NumItems"];
                 if (string.IsNullOrEmpty(numItemsStr))
                 {
@@ -57,10 +58,10 @@ namespace Company.Function
                 response.Headers.Add("Content-Type", "application/json");
 
                 var query = $@"select TOP {numItems} * from {tableSchema}.{tableNameStr} {filter}";
-                var sql = Query?["Sql"];
-                if (sql != null)
+                var sqlQuery = Query?["Sql"];
+                if (sqlQuery != null)
                 {
-                    query = sql;
+                    query = sqlQuery;
                 }
                 _logger.LogInformation($"Sql: {query}");
                 using var sqlUtil = await SqlUtility.CreateSqlUtilityAsync();
@@ -97,9 +98,11 @@ namespace Company.Function
             }
             catch (System.Exception ex)
             {
-                response.WriteString(ex.ToString());
+                var jobject = new JObject();
+                jobject.Add("Error", ex.ToString());
+                var json = JsonConvert.SerializeObject(jobject, SqlUtility.jsonsettingsIndented);
+                await response.WriteStringAsync(json);
             }
-
             return response;
         }
     }

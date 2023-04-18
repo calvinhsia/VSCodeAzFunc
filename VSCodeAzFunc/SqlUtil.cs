@@ -65,6 +65,7 @@ public class SqlUtility : IDisposable
             catch (Exception ex)
             {
                 Trace.WriteLine($"Error getting {desc}\r\n{ex.Message}");
+                throw;
             }
         }
     });

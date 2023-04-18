@@ -13,6 +13,28 @@ using Newtonsoft.Json;
 [TestClass]
 public class UnitTest1 : TestBase
 {
+//https://learn.microsoft.com/en-us/dotnet/core/tutorials/testing-library-with-visual-studio-code?pivots=dotnet-7-0
+    [TestMethod]
+    public async Task TestGetWordData()
+    {
+        var oc = new GetWordDataClass(loggerFactory: this);
+        oc.random = new Random(1);
+        var logger = CreateLogger("test");
+
+        logger.LogInformation($"logger ");
+        var req = new MyHttpRequestData(
+            new MyFunctionContext(serviceProvider: this),
+            new Uri($"localhost:7160/api/GetWordData?Driver_Id=2")
+        );
+
+        var resp = await oc.GetWordData(req) as MyHttpResponseData;
+        var str = resp!.GetResultAsString();
+        Trace.WriteLine($"{str}");
+
+
+
+    }
+
     [TestMethod]
     public async Task TestHTTPTrigger()
     {
@@ -47,16 +69,16 @@ public class UnitTest1 : TestBase
             "Word of the day:",
             """name": "Accessories","""
         });
-    } 
+    }
 
     [TestMethod]
     public async Task TestGetSqlData()
     {
-        var oc = new GetSqlDataClass(loggerFactory:this);
+        var oc = new GetSqlDataClass(loggerFactory: this);
         var logger = CreateLogger(nameof(TestGetSqlData));
         logger.LogInformation($"Starting {nameof(TestGetSqlData)}");
         var req = new MyHttpRequestData(
-            new MyFunctionContext(serviceProvider:this),
+            new MyFunctionContext(serviceProvider: this),
             new Uri($"localhost:7160/api/GetSqlData?Table=Customer&NumItems=10&PrettyPrint=1&TableName=Customer&Filter=where%20CompanyName%20like%20%27%25bike%25%27")
         );
         var resp = await oc.GetSqlData(req) as MyHttpResponseData;
@@ -64,6 +86,7 @@ public class UnitTest1 : TestBase
         Trace.WriteLine(data);
         var json = JsonConvert.DeserializeObject(data);
     }
+
     [TestMethod]
     public async Task TestGetSqlDataWithSqlStatement()
     {
@@ -83,14 +106,35 @@ public class UnitTest1 : TestBase
             """SalesPerson": "adventure-works\\pamela0"""
             });
     }
+
     [TestMethod]
-    public async Task TestGetSqlDataCustomerBike()
+    public async Task TestGetSqlDataWithSqlStatementWithError()
     {
-        var oc = new GetSqlDataClass(loggerFactory:this);
+        var oc = new GetSqlDataClass(loggerFactory: this);
         var logger = CreateLogger(nameof(TestGetSqlData));
         logger.LogInformation($"Starting {nameof(TestGetSqlData)}");
         var req = new MyHttpRequestData(
-            new MyFunctionContext(serviceProvider:this),
+            new MyFunctionContext(serviceProvider: this),
+            new Uri($"localhost:7160/api/GetSqlData?PrettyPrint=1&Sql=Select aeafasdfasdf* from Customer")
+        );
+        var resp = await oc.GetSqlData(req) as MyHttpResponseData;
+        var data = resp!.GetResultAsString();
+        Trace.WriteLine(data);
+        var json = JsonConvert.DeserializeObject(data);
+        //       "Error": "Microsoft.Data.SqlClient.SqlException (0x80131904): Incorrect syntax near the keyword 'from'.\r\n   at Microsoft.Data.SqlClient.SqlConnection.OnError(SqlException exception, Boolean breakConnection, Action`1 wrapCloseInAction)\r\n   at Microsoft.Data.SqlClient.SqlInternalConnection.OnError(SqlException exception, Boolean breakConnection, Action`1 wrapCloseInAction)\r\n   at Microsoft.Data.SqlClient.TdsParser.ThrowExceptionAndWarning(TdsParserStateObject stateObj, Boolean callerHasConnectionLock, Boolean asyncClose)\r\n   at Microsoft.Data.SqlClient.TdsParser.TryRun(RunBehavior runBehavior, SqlCommand cmdHandler, SqlDataReader dataStream, BulkCopySimpleResultSet bulkCopyHandler, TdsParserStateObject stateObj, Boolean& dataReady)\r\n   at Microsoft.Data.SqlClient.SqlDataReader.TryConsumeMetaData()\r\n   at Microsoft.Data.SqlClient.SqlDataReader.get_MetaData()\r\n   at Microsoft.Data.SqlClient.SqlCommand.FinishExecuteReader(SqlDataReader ds, RunBehavior runBehavior, String resetOptionsString, Boolean isInternal, Boolean forDescribeParameterEncryption, Boolean shouldCacheForAlwaysEncrypted)\r\n   at Microsoft.Data.SqlClient.SqlCommand.CompleteAsyncExecuteReader(Boolean isInternal, Boolean forDescribeParameterEncryption)\r\n   at Microsoft.Data.SqlClient.SqlCommand.InternalEndExecuteReader(IAsyncResult asyncResult, Boolean isInternal, String endMethod)\r\n   at Microsoft.Data.SqlClient.SqlCommand.EndExecuteReaderInternal(IAsyncResult asyncResult)\r\n   at Microsoft.Data.SqlClient.SqlCommand.EndExecuteReaderAsync(IAsyncResult asyncResult)\r\n   at Microsoft.Data.SqlClient.SqlCommand.EndExecuteReaderAsyncCallback(IAsyncResult asyncResult)\r\n   at System.Threading.Tasks.TaskFactory`1.FromAsyncCoreLogic(IAsyncResult iar, Func`2 endFunction, Action`1 endAction, Task`1 promise, Boolean requiresSynchronization)\r\n--- End of stack trace from previous location ---\r\n   at Company.Function.SqlUtility.<>c__DisplayClass5_0.<<DoQuerySqlAsync>b__0>d.MoveNext() in c:\\Users\\calvinh\\source\\repos\\VSCodeAzFunc\\VSCodeAzFunc\\SqlUtil.cs:line 44\r\n--- End of stack trace from previous location ---\r\n   at Company.Function.GetSqlDataClass.GetSqlData(HttpRequestData req) in c:\\Users\\calvinh\\source\\repos\\VSCodeAzFunc\\VSCodeAzFunc\\GetSqlData.cs:line 69\r\nClientConnectionId:09234512-a7c8-4fdb-a7ba-f56ca6c78cb6\r\nError Number:156,State:1,Class:15"
+        VerifyLogStrings(new[] {
+            "Microsoft.Data.SqlClient.SqlException",
+            });
+    }
+
+    [TestMethod]
+    public async Task TestGetSqlDataCustomerBike()
+    {
+        var oc = new GetSqlDataClass(loggerFactory: this);
+        var logger = CreateLogger(nameof(TestGetSqlData));
+        logger.LogInformation($"Starting {nameof(TestGetSqlData)}");
+        var req = new MyHttpRequestData(
+            new MyFunctionContext(serviceProvider: this),
             new Uri($"localhost:7160/api/GetSqlData?Table=Customer&NumItems=10&Filter=%25bik%25")
         );
         var resp = await oc.GetSqlData(req) as MyHttpResponseData;

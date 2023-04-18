@@ -99,7 +99,7 @@ public class TestBase : ILoggerFactory, IServiceProvider
             //var logger = CreateLogger(serviceType.GenericTypeArguments[0].Name);
             //return logger;
         }
-        throw new NotImplementedException();
+        throw new NotImplementedException($"ServiceNotImplemented {serviceType}");
     }
 }
 public class MyLogger : ILogger
