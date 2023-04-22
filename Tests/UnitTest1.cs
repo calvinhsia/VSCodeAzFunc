@@ -13,7 +13,7 @@ using Newtonsoft.Json;
 [TestClass]
 public class UnitTest1 : TestBase
 {
-//https://learn.microsoft.com/en-us/dotnet/core/tutorials/testing-library-with-visual-studio-code?pivots=dotnet-7-0
+    //https://learn.microsoft.com/en-us/dotnet/core/tutorials/testing-library-with-visual-studio-code?pivots=dotnet-7-0
     [TestMethod]
     public async Task TestGetWordData()
     {
@@ -29,7 +29,12 @@ public class UnitTest1 : TestBase
 
         var resp = await oc.GetWordData(req) as MyHttpResponseData;
         var str = resp!.GetResultAsString();
-        Trace.WriteLine($"{str}");
+        logger.LogInformation($"{str}");
+        VerifyLogStrings(new[] {
+            """RandWord": "DISCONTINUED""",
+            """Grid": "_D_DITIENNUS_OC_""",
+            """GridWithRandomLetters": "DDDDITIENNUSJOCM"""
+        });
     }
 
     [TestMethod]
@@ -103,6 +108,43 @@ public class UnitTest1 : TestBase
             """SalesPerson": "adventure-works\\pamela0"""
             });
     }
+
+    [TestMethod]
+    public async Task TestGetSqlDataWithCreateTable()
+    {
+        /*
+        create table foo (name varchar(20))
+        insert into foo (name) values ('myname')
+        select * from foo
+        drop table foo
+        */
+        var cmds = new[]
+        {
+            "create table foo (name varchar(20))",
+            "insert into foo (name) values ('myname')",
+            "select * from foo",
+            "drop table foo",
+            "drop table foo" // cause an error
+        };
+        var oc = new GetSqlDataClass(loggerFactory: this);
+        var logger = CreateLogger(nameof(TestGetSqlData));
+        logger.LogInformation($"Starting {nameof(TestGetSqlData)}");
+        foreach (var cmd in cmds)
+        {
+            var req = new MyHttpRequestData(
+                new MyFunctionContext(serviceProvider: this),
+                new Uri($"localhost:7160/api/GetSqlData?PrettyPrint=1&Sql={cmd}")
+            );
+            var resp = await oc.GetSqlData(req) as MyHttpResponseData;
+            var data = resp!.GetResultAsString();
+            logger.LogInformation(data);
+            var json = JsonConvert.DeserializeObject(data);
+        }
+        VerifyLogStrings(new[] {
+            "Cannot drop the table 'foo', because it does not exist or you do not have permission"
+            });
+    }
+
 
     [TestMethod]
     public async Task TestGetSqlDataWithSqlStatementWithError()

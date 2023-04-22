@@ -39,6 +39,8 @@ namespace Company.Function
                 jObject.Add("RandWord", randWord);
                 jObject.Add("Grid", grid);
                 jObject.Add("Calculatedin", sw.Elapsed.TotalSeconds.ToString("n3"));
+                var gridWithRandLetters = new string(grid.Select(ltr => ltr == '_' ? (char)(random!.Next(26) + 65) : ltr).ToArray());
+                jObject.Add("GridWithRandomLetters", gridWithRandLetters);
 
                 await response.WriteStringAsync(JsonConvert.SerializeObject(jObject, SqlUtility.jsonsettingsIndented));
             }

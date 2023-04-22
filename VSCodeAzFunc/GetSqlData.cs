@@ -65,8 +65,7 @@ namespace Company.Function
                 }
                 _logger.LogInformation($"Sql: {query}");
                 using var sqlUtil = await SqlUtility.CreateSqlUtilityAsync();
-                var jarray = new JArray();
-                await sqlUtil.DoQuerySqlAsync(query, "get data", (rdr) =>
+                var jarray = await sqlUtil.DoQuerySqlAsync(query, "get data", (rdr) =>
                 {
                     //var obj = new
                     //{
@@ -83,14 +82,14 @@ namespace Company.Function
                     //                        .Select(rdr.GetName)
                     //                        .ToList();
 
-                    var js = new JObject();
-                    for (var i = 0; i < rdr.FieldCount; i++)
-                    {
-                        var colname = rdr.GetName(i);
-                        var val = rdr.GetValue(i);
-                        js.Add(colname, val.ToString());
-                    }
-                    jarray.Add(js);
+                    //var js = new JObject();
+                    //for (var i = 0; i < rdr.FieldCount; i++)
+                    //{
+                    //    var colname = rdr.GetName(i);
+                    //    var val = rdr.GetValue(i);
+                    //    js.Add(colname, val.ToString());
+                    //}
+                    //jarray.Add(js);
                 });
                 _logger.LogInformation($"Sql # results = : {jarray.Count}");
                 var json = JsonConvert.SerializeObject(jarray, prettyprint ? SqlUtility.jsonsettingsIndented : null);
